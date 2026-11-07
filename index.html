@@ -2,122 +2,78 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SmartSheet AI</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#f4f6ff;font-family:Arial,sans-serif;padding:22px}
-.container{max-width:900px;margin:auto}header{text-align:center;padding:28px 8px 34px}
-h1{font-size:34px;color:#72a7ff;margin:0 0 10px}.sub{color:#aab3c8;font-size:17px}
-.card{background:#151f35;border:1px solid #293752;border-radius:16px;padding:22px;margin:16px 0}
-h2{font-size:21px;margin:0 0 14px}p{color:#aab3c8;line-height:1.5}
-textarea,input[type=file]{width:100%;background:#0b1325;color:white;border:1px solid #40516f;border-radius:10px;padding:14px;font-size:16px}
-textarea{min-height:170px;resize:vertical}button{background:#3478f6;color:white;border:0;padding:13px 18px;border-radius:9px;font-size:15px;font-weight:bold;margin:12px 8px 0 0}
-button.secondary{background:#35435c}button:disabled{opacity:.45}
-#status{color:#91baff;margin-top:12px}.tablewrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:500px;background:#0b1325}
-th,td{border:1px solid #35435c;padding:11px;text-align:left;white-space:normal}
-th{background:#263b60;color:#fff}footer{text-align:center;color:#8390a8;padding:25px}
-.small{font-size:14px}
+*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#f4f6ff;font-family:Arial,sans-serif;padding:20px}.container{max-width:1000px;margin:auto}header{text-align:center;padding:20px 0}h1{font-size:34px;color:#72a7ff;margin:8px}.sub,.small{color:#aab3c8;line-height:1.5}.card{background:#151e32;border:1px solid #293752;border-radius:16px;padding:20px;margin:16px 0}h2{font-size:20px;margin:0 0 14px}textarea,input[type=file]{width:100%;background:#0b1325;color:white;border:1px solid #40516f;border-radius:10px;padding:13px;font-size:16px}textarea{min-height:170px;resize:vertical}button{background:#3478f6;color:white;border:0;padding:13px 18px;border-radius:9px;font-size:15px;font-weight:bold;margin:10px 8px 0 0;cursor:pointer}.secondary{background:#35435c}#status{color:#91baff;line-height:1.5}.tablewrap{overflow:auto;margin-top:14px}table{border-collapse:collapse;width:100%;min-width:720px;background:#0b1325;font-size:13px}th,td{border:1px solid #35435c;padding:10px;text-align:left;white-space:nowrap}th{background:#263b60}footer{text-align:center;color:#8390a8;padding:25px}
 </style>
 </head>
-<body>
-<div class="container">
-<header><h1>⚡ SmartSheet AI</h1><div class="sub">AI Powered Automatic Excel Data Entry Platform</div></header>
-<section class="card">
-<h2>📂 Upload Your File</h2>
-<p>Choose a TXT, CSV, JSON or Excel file, or paste your information below.</p>
-<input type="file" id="file" accept=".txt,.csv,.json,.xlsx,.xls">
-<p class="small">Note: PDF, Word and image OCR require a future AI/OCR backend.</p>
-</section>
-<section class="card">
-<h2>✍️ Paste Your Data</h2>
-<textarea id="data" placeholder="Example: Name: Rahul, Class: 10, Roll: 25, School: ABC High School, Marks: 85"></textarea>
-<button onclick="analyze()">✨ Analyze Data</button>
-<button class="secondary" onclick="clearAll()">Clear</button>
-<div id="status">Ready to analyze your data.</div>
-</section>
-<section class="card">
-<h2>📊 Automatic Category</h2><p id="category">Waiting for data...</p>
-</section>
-<section class="card">
-<h2>📋 Excel Preview</h2>
-<p class="small">Each record is arranged in one row; headings run from left to right.</p>
-<div class="tablewrap"><table id="preview"><thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody></table></div>
-<button id="download" onclick="downloadExcel()" disabled>⬇ Download Excel (.xlsx)</button>
-<button id="csv" class="secondary" onclick="downloadCSV()" disabled>Download CSV</button>
-</section>
-<footer>SmartSheet AI • Automatic Data Entry</footer>
-</div>
+<body><div class="container">
+<header><h1>⚡ SmartSheet AI</h1><p class="sub">AI Powered Automatic Excel Data Entry Platform</p></header>
+<section class="card"><h2>📂 Upload Your File</h2><input id="file" type="file" accept=".txt,.csv,.json,.xlsx,.xls"><p class="small">Starter version: TXT, CSV, JSON and Excel. PDF, Word and image OCR require an AI/OCR backend.</p></section>
+<section class="card"><h2>✍️ Paste Your Data</h2>
+<textarea id="data" placeholder="Paste tabular data, for example:
+Employee ID,Employee Name,Department,Basic Salary,HRA,Other Allowance,Deduction
+EMP101,Rahul Das,Sales,18000,3000,2000,500
+EMP102,Mina Roy,HR,22000,4000,1500,1000"></textarea>
+<p class="small">For multiple employees, use comma-separated rows with the first line as headings.</p>
+<button onclick="analyze()">✨ Analyze Data</button><button class="secondary" onclick="clearAll()">Clear</button><p id="status">Ready to analyze your data.</p></section>
+<section class="card"><h2>📊 Automatic Category</h2><p id="category">Waiting for data...</p></section>
+<section class="card"><h2>📋 Excel Preview</h2><p class="small" id="hint">Your organized data will appear here.</p><div class="tablewrap"><table id="preview"><thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody></table></div><button onclick="downloadExcel()">⬇ Download Excel (.xlsx)</button><button class="secondary" onclick="downloadCSV()">Download CSV</button></section>
+<footer>SmartSheet AI • Automatic Data Entry</footer></div>
 <script>
-let records=[], headers=[];
-const categories=[
-["Student Information Entry",["student","school","class","roll","marks","grade","admission"]],
-["Employee Data Entry",["employee","salary","designation","department","staff","joining"]],
-["Hospital / Patient Records",["patient","hospital","diagnosis","doctor","age","treatment"]],
-["Sales & Purchase Entry",["sales","purchase","quantity","customer","supplier"]],
-["Inventory Management",["inventory","stock","warehouse","item","product","sku"]],
-["Bank Statement Entry",["bank","account","transaction","debit","credit","balance"]],
-["Invoice & Billing Entry",["invoice","bill","gst","tax","subtotal","total"]],
-["Survey Data Entry",["survey","response","feedback","question"]],
-["Product Listing",["product","price","brand","description"]],
-["Customer Database Entry",["customer","client","phone","email","address"]],
-["Attendance & Payroll Entry",["attendance","payroll","present","absent","overtime"]],
-["Accounting Data Entry",["accounting","ledger","expense","income","payment"]]
-];
-function detectCategory(text){let s=text.toLowerCase(),best="General Data Entry",score=0;for(const [name,words] of categories){let n=words.filter(w=>s.includes(w)).length;if(n>score){score=n;best=name}}return best}
-function parsePairs(text){
-  let pairs=[], cleaned=text.trim();
-  // Supports "Name: Rahul, Class: 10" and one key/value per line.
-  const re=/([A-Za-z][A-Za-z0-9 _()/-]{0,40})\s*:\s*([^,\n;]+)(?:[,;]|$)/g;
-  let m; while((m=re.exec(cleaned))!==null)pairs.push([m[1].trim(),m[2].trim()]);
-  if(!pairs.length){
-    const lines=cleaned.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-    for(const line of lines){let ix=line.indexOf(":");if(ix>0)pairs.push([line.slice(0,ix).trim(),line.slice(ix+1).trim()]);}
-  }
-  if(pairs.length){let obj={};pairs.forEach(([k,v])=>obj[k]=v);return [obj]}
-  return [];
+let headers=[],records=[],isPayroll=false;
+const $=id=>document.getElementById(id);
+function norm(s){return String(s).toLowerCase().replace(/[^a-z0-9]/g,'');}
+function parseCSV(text){
+ const lines=text.trim().split(/\r?\n/).filter(x=>x.trim()); if(!lines.length)return [];
+ const delim=lines[0].includes('\t')?'\t':',';
+ return lines.map(line=>{let out=[],v='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){v+='"';i++;}else q=!q;}else if(c===delim&&!q){out.push(v.trim());v='';}else v+=c;}out.push(v.trim());return out;});
 }
+function detectCategory(s){s=s.toLowerCase();if(/employee|salary|designation|staff|hra|payroll/.test(s))return 'Attendance & Payroll Entry';if(/student|class|roll|school|marks/.test(s))return 'Student Information Entry';if(/patient|hospital|doctor|diagnosis/.test(s))return 'Hospital / Patient Records';if(/invoice|billing|gst/.test(s))return 'Invoice & Billing Entry';if(/product|stock|inventory|quantity/.test(s))return 'Inventory / Product Entry';if(/customer|phone|email|client/.test(s))return 'Customer Database Entry';if(/sales|purchase|order/.test(s))return 'Sales & Purchase Entry';if(/bank|transaction|debit|credit/.test(s))return 'Bank Statement Entry';return 'General Data Entry';}
 function analyze(){
- const text=document.getElementById("data").value.trim();
- if(!text){document.getElementById("status").textContent="Please paste data or choose a supported file.";return}
- let parsed=parsePairs(text);
- if(!parsed.length){document.getElementById("status").textContent="I couldn't identify field labels. Please use labels like Name: Rahul, Class: 10.";return}
- records=parsed;headers=[...new Set(records.flatMap(r=>Object.keys(r)))];
- document.getElementById("category").textContent=detectCategory(text);
- render();
- document.getElementById("status").textContent="Analysis complete. Your information is arranged horizontally, one record per row.";
- document.getElementById("download").disabled=false;document.getElementById("csv").disabled=false;
-}
-function render(){
- const table=document.getElementById("preview");
- table.innerHTML="<thead><tr>"+headers.map(h=>"<th>"+escapeHtml(h)+"</th>").join("")+"</tr></thead><tbody>"+
- records.map(r=>"<tr>"+headers.map(h=>"<td>"+escapeHtml(r[h]??"")+"</td>").join("")+"</tr>").join("")+"</tbody>";
-}
-function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function downloadExcel(){
- if(!records.length)return;
- if(typeof XLSX==="undefined"){document.getElementById("status").textContent="Excel library did not load. Check your internet connection and retry.";return}
- const ws=XLSX.utils.json_to_sheet(records,{header:headers});
- const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"SmartSheet Data");
- XLSX.writeFile(wb,"SmartSheet-AI-Data.xlsx");
-}
-function downloadCSV(){
- if(!records.length)return;
- const quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
- const lines=[headers.map(quote).join(","),...records.map(r=>headers.map(h=>quote(r[h])).join(","))];
- const blob=new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
- const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="SmartSheet-AI-Data.csv";a.click();URL.revokeObjectURL(a.href);
-}
-function clearAll(){document.getElementById("data").value="";document.getElementById("file").value="";records=[];headers=[];document.getElementById("preview").innerHTML="<thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody>";document.getElementById("category").textContent="Waiting for data...";document.getElementById("status").textContent="Ready to analyze your data.";document.getElementById("download").disabled=true;document.getElementById("csv").disabled=true}
-document.getElementById("file").addEventListener("change",async e=>{
- const f=e.target.files[0];if(!f)return;
+ const raw=$('data').value.trim();if(!raw){$('status').textContent='Please paste data or choose a file.';return;}
  try{
-  if(/\.(txt|csv|json)$/i.test(f.name)){document.getElementById("data").value=await f.text();document.getElementById("status").textContent="File loaded. Press Analyze Data."}
-  else if(/\.(xlsx|xls)$/i.test(f.name)){if(typeof XLSX==="undefined")throw Error("Excel library unavailable");const b=await f.arrayBuffer();const wb=XLSX.read(b);const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});if(rows.length){records=rows;headers=[...new Set(rows.flatMap(r=>Object.keys(r)))];document.getElementById("category").textContent=detectCategory(JSON.stringify(rows));render();document.getElementById("status").textContent="Excel file loaded and previewed.";document.getElementById("download").disabled=false;document.getElementById("csv").disabled=false}else throw Error("No rows found")}
-  else document.getElementById("status").textContent="This file type needs AI/OCR processing, which is not connected yet.";
- }catch(err){document.getElementById("status").textContent="Could not read file: "+err.message}
-});
-</script>
-</body>
-</html>
+  if(raw.startsWith('{')||raw.startsWith('[')){let j=JSON.parse(raw);records=Array.isArray(j)?j:[j];headers=[...new Set(records.flatMap(o=>Object.keys(o)))];}
+  else{
+   const rows=parseCSV(raw);
+   if(rows.length>1 && rows[0].length>1){headers=rows[0];records=rows.slice(1).filter(r=>r.some(v=>v!=='')).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));}
+   else {const obj={};raw.split(/\r?\n/).forEach(line=>{let m=line.match(/^([^:：]+)\s*[:：]\s*(.*)$/);if(m)obj[m[1].trim()]=m[2].trim();});headers=Object.keys(obj);records=[obj];}
+  }
+  if(!headers.length||!records.length)throw Error('No data rows found.');
+  const all=Object.keys(records[0]).map(norm);
+  const hasEmployee=all.some(k=>['employeeid','empid','employeename','employee','staffname'].includes(k));
+  const hasPay=all.some(k=>['basicsalary','basic','hra','salary','deduction','otherallowance'].includes(k));
+  isPayroll=hasEmployee&&hasPay;
+  if(isPayroll) addPayrollColumns();
+  render();$('category').textContent=detectCategory(headers.join(' ')+' '+raw);
+  $('hint').textContent=isPayroll?'Payroll detected. Gross Salary = Basic + HRA + Other Allowance + Overtime. Net Salary = Gross Salary − Total Deduction. Missing optional amounts are treated as ₹0; check values before export.':'Data arranged with one record per row.';
+  $('status').textContent=`Analysis complete: ${records.length} record(s), ${headers.length} columns.`;
+ }catch(e){$('status').textContent='Could not analyze: '+e.message;}
+}
+function findKey(obj,names){return Object.keys(obj).find(k=>names.includes(norm(k)));}
+function num(v){let n=Number(String(v??'').replace(/[₹,\s]/g,''));return Number.isFinite(n)?n:0;}
+function addPayrollColumns(){
+ const first=records[0];const basicKey=findKey(first,['basicsalary','basic','basicpay']);
+ const hraKey=findKey(first,['hra','house rent allowance']);
+ const otherKey=findKey(first,['otherallowance','allowance','otherallowances']);
+ const overtimeKey=findKey(first,['overtime','overtimeamount','otamount']);
+ const deductionKey=findKey(first,['deduction','totaldeduction','deductions']);
+ const grossKey='Gross Salary',totalDedKey='Total Deduction',netKey='Net Salary';
+ for(const r of records){
+  const gross=num(r[basicKey])+num(r[hraKey])+num(r[otherKey])+num(r[overtimeKey]);
+  const ded=num(r[deductionKey]);
+  r[grossKey]=gross;r[totalDedKey]=ded;r[netKey]=gross-ded;
+ }
+ headers=[...headers.filter(h=>![grossKey,totalDedKey,netKey].includes(h)),grossKey,totalDedKey,netKey];
+}
+function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function render(){ $('preview').innerHTML='<thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+records.map(r=>'<tr>'+headers.map(h=>'<td>'+esc(r[h]??'')+'</td>').join('')+'</tr>').join('')+'</tbody>'; }
+function csv(){return [headers,...records.map(r=>headers.map(h=>r[h]??''))].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');}
+function save(blob,name){let a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+function downloadCSV(){if(!records.length)return $('status').textContent='Analyze data first.';save(new Blob(['\ufeff'+csv()],{type:'text/csv;charset=utf-8'}),'SmartSheet-AI-Data.csv');}
+function downloadExcel(){if(!records.length)return $('status').textContent='Analyze data first.';if(!window.XLSX)return $('status').textContent='Excel library not loaded. Check internet and retry.';let ws=XLSX.utils.json_to_sheet(records,{header:headers});let wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,isPayroll?'Payroll':'SmartSheet Data');XLSX.writeFile(wb,'SmartSheet-AI-Data.xlsx');}
+function clearAll(){headers=[];records=[];isPayroll=false;$('data').value='';$('category').textContent='Waiting for data...';$('status').textContent='Ready to analyze your data.';$('hint').textContent='Your organized data will appear here.';$('preview').innerHTML='<thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody>';}
+$('file').addEventListener('change',async e=>{let f=e.target.files[0];if(!f)return;try{if(/\.(xlsx|xls)$/i.test(f.name)){if(!window.XLSX)throw Error('Excel reader not loaded.');let wb=XLSX.read(await f.arrayBuffer());let rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows.length)throw Error('No data found in workbook.');headers=Object.keys(rows[0]);records=rows;$('data').value=JSON.stringify(rows,null,2);analyze();}else{$('data').value=await f.text();analyze();}}catch(err){$('status').textContent=err.message;}});
+</script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</body></html>
