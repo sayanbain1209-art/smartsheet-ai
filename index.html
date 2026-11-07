@@ -1,0 +1,179 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartSheet AI</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1020;color:#f4f6ff;font-family:Arial,sans-serif;padding:20px}
+.container{max-width:850px;margin:auto}
+header{text-align:center;padding:25px 10px}
+h1{font-size:34px;color:#72a7ff;margin-bottom:8px}
+.sub{color:#aab3c8}
+.card{background:#151e32;border:1px solid #293752;border-radius:15px;padding:20px;margin:16px 0}
+h2{font-size:19px;margin-top:0}
+textarea{width:100%;height:150px;background:#0b1325;color:white;border:1px solid #40516f;border-radius:10px;padding:13px;font-size:15px}
+input[type=file]{width:100%;padding:12px;background:#0b1325;border-radius:9px;color:white}
+button{background:#3478f6;color:white;border:0;padding:13px 18px;border-radius:9px;font-size:15px;font-weight:bold;margin:8px 5px 0 0}
+button.secondary{background:#35435c}
+button:active{opacity:.7}
+#status{color:#91baff;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid #35435c;padding:9px;text-align:left}
+th{background:#263b60}
+.tablewrap{overflow-x:auto}
+footer{text-align:center;color:#8390a8;padding:25px}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>⚡ SmartSheet AI</h1>
+<p class="sub">AI Powered Automatic Excel Data Entry Platform</p>
+</header>
+
+<div class="card">
+<h2>📂 Upload Your Files</h2>
+<p class="sub">Choose a file or paste your data below.</p>
+<input type="file" id="file" accept=".txt,.csv,.json,.xlsx,.xls,.pdf,.docx,.png,.jpg,.jpeg">
+<p class="sub">Supported file selection: TXT, CSV, JSON, Excel, PDF, Word and images. Some formats need additional AI/OCR processing.</p>
+</div>
+
+<div class="card">
+<h2>✍️ Paste Your Data</h2>
+<textarea id="data" placeholder="Paste any information here...&#10;&#10;Example: Name: Rahul, Class: 10, Roll: 25"></textarea>
+<br>
+<button onclick="analyze()">✨ Analyze Data</button>
+<button class="secondary" onclick="clearAll()">Clear</button>
+<p id="status">Ready to analyze your data.</p>
+</div>
+
+<div class="card">
+<h2>📊 Automatic Category</h2>
+<p id="category">Waiting for data...</p>
+</div>
+
+<div class="card">
+<h2>📋 Excel Preview</h2>
+<div class="tablewrap">
+<table id="preview">
+<thead><tr><th>Your data will appear here</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<button onclick="downloadCSV()">⬇ Download CSV</button>
+</div>
+
+<footer>SmartSheet AI • Automatic Data Entry</footer>
+</div>
+
+<script>
+let rows=[];
+
+const categories=[
+["Student Information Entry",["student","school","class","roll","admission","marks","grade"]],
+["Employee Data Entry",["employee","salary","designation","department","staff"]],
+["Hospital / Patient Records",["patient","hospital","doctor","diagnosis","medicine"]],
+["Sales & Purchase Entry",["sales","purchase","quantity","buyer","seller"]],
+["Inventory Management",["inventory","stock","warehouse","product","available"]],
+["Bank Statement Entry",["bank","account","deposit","withdrawal","transaction"]],
+["Invoice & Billing Entry",["invoice","bill","gst","tax","total amount"]],
+["Survey Data Entry",["survey","feedback","respondent","question","answer"]],
+["Product Listing",["product","sku","brand","price","description"]],
+["Customer Database Entry",["customer","client","email","phone","address"]],
+["Attendance & Payroll Entry",["attendance","present","absent","payroll","overtime"]],
+["Accounting Data Entry",["accounting","debit","credit","ledger","balance"]]
+];
+
+function detect(text){
+let lower=text.toLowerCase();
+let best="General Data Entry";
+let score=0;
+categories.forEach(item=>{
+let count=item[1].filter(word=>lower.includes(word)).length;
+if(count>score){score=count;best=item[0]}
+});
+return best;
+}
+
+document.getElementById("file").addEventListener("change",async function(){
+let f=this.files[0];
+if(!f)return;
+if(f.size>5*1024*1024){
+document.getElementById("status").textContent="File too large. Please choose a file under 5 MB.";
+return;
+}
+if(f.name.match(/\.(txt|csv|json)$/i)){
+document.getElementById("data").value=await f.text();
+document.getElementById("status").textContent="File loaded. Press Analyze Data.";
+}else{
+document.getElementById("status").textContent="This file type needs PDF/Word/Image/Excel extraction support, which will be added in the next development stage.";
+}
+});
+
+function analyze(){
+let text=document.getElementById("data").value.trim();
+if(!text){
+document.getElementById("status").textContent="Please paste some data first.";
+return;
+}
+let category=detect(text);
+document.getElementById("category").textContent=category;
+
+let lines=text.split(/\n+/).filter(x=>x.trim());
+rows=[["Field","Information"]];
+
+lines.forEach(line=>{
+let parts=line.split(/[:=,;\t]/);
+if(parts.length>=2){
+let key=parts.shift().trim();
+let value=parts.join(" ").trim();
+if(key&&value)rows.push([key,value]);
+else rows.push(["Unstructured data",line.trim()]);
+}else{
+rows.push(["Unstructured data",line.trim()]);
+}
+});
+
+if(rows.length===1)rows.push(["Unstructured data",text]);
+
+let html="<thead><tr><th>Field</th><th>Information</th></tr></thead><tbody>";
+rows.slice(1).forEach(r=>{
+html+="<tr><td>"+escapeHTML(r[0])+"</td><td>"+escapeHTML(r[1])+"</td></tr>";
+});
+html+="</tbody>";
+document.getElementById("preview").innerHTML=html;
+document.getElementById("status").textContent="Analysis complete. Please review the preview.";
+}
+
+function escapeHTML(s){
+return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function downloadCSV(){
+if(rows.length<2){
+alert("Please analyze your data first.");
+return;
+}
+let csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\n");
+let blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="SmartSheet-AI-Data.csv";
+a.click();
+URL.revokeObjectURL(a.href);
+}
+
+function clearAll(){
+document.getElementById("data").value="";
+document.getElementById("file").value="";
+document.getElementById("category").textContent="Waiting for data...";
+document.getElementById("preview").innerHTML="<thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody>";
+document.getElementById("status").textContent="Ready to analyze your data.";
+rows=[];
+}
+</script>
+</body>
+</html>
