@@ -83,7 +83,7 @@ function analyze(){
   isPayroll=hasEmployee&&hasPay;
   if(isPayroll)addPayrollColumns();
   $('category').textContent=detectCategory(headers.join(' ')+' '+raw);
-  $('hint').textContent=isPayroll?'Payroll detected. Gross Salary = Basic + HRA + Other Allowance + Overtime. Net Salary = Gross Salary − Total Deduction. Missing optional amounts are treated as ₹0; verify them before export.':'One record is arranged per row. Excel export includes formatted headings, fitted columns and wrapped cells.';
+  $('hint').textContent=isPayroll?'Payroll detected. Gross Salary = Basic + HRA + Other Allowance + Overtime. Net Salary = Gross Salary − Total Deduction. Missing optional amounts are treated as ₹0; verify them before export.':'One record is arranged per row. Excel export uses balanced column widths, wrapped headings, fitted row heights, frozen headings and print-to-page settings.';
   render();autoFitAll();
   $('status').textContent=`Analysis complete: ${records.length} record(s), ${headers.length} columns.`;
  }catch(e){$('status').textContent='Could not analyze: '+e.message;}
@@ -129,13 +129,22 @@ function autoFitAll(){autoFitColumns();autoFitRows();}
 function csv(){return [headers,...records.map(r=>headers.map(h=>r[h]??''))].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');}
 function save(blob,name){let a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);}
 function downloadCSV(){if(!records.length)return $('status').textContent='Analyze data first.';save(new Blob(['\ufeff'+csv()],{type:'text/csv;charset=utf-8'}),'SmartSheet-AI-Data.csv');}
+function longestWordWidth(value){
+ const words=String(value??'').split(/\\s+/).filter(Boolean);
+ return Math.max(0,...words.map(displayWidth));
+}
 function excelColWidth(header,values){
- const longest=Math.max(displayWidth(header),...values.map(v=>displayWidth(v)));
- return Math.max(16,Math.min(60,Math.ceil(longest+5)));
+ // Balance the full text length with the longest unbroken word.
+ // This avoids extremely wide columns while keeping headings readable.
+ const all=[header,...values].map(v=>String(v??''));
+ const full=Math.max(0,...all.map(displayWidth));
+ const word=Math.max(0,...all.map(longestWordWidth));
+ return Math.max(14,Math.min(34,Math.ceil(Math.max(word+2,full*0.58+3))));
 }
 function wrappedLines(value,width){
- const text=String(value??'');if(!text)return 1;
- return Math.max(1,Math.ceil(displayWidth(text)/Math.max(10,width-2)));
+ const text=String(value??'').trim();if(!text)return 1;
+ const usable=Math.max(8,width-2);
+ return Math.max(1,Math.ceil(displayWidth(text)/usable));
 }
 async function downloadExcel(){
  if(!records.length)return $('status').textContent='Analyze data first.';
@@ -144,10 +153,15 @@ async function downloadExcel(){
   autoFitAll();
   const wb=new ExcelJS.Workbook();
   wb.creator='SmartSheet AI';wb.subject='Automatically organized data';wb.created=new Date();
-  const ws=wb.addWorksheet(isPayroll?'Payroll':'SmartSheet Data',{views:[{state:'frozen',ySplit:1}]});
-  ws.columns=headers.map(h=>({header:String(h),key:String(h),width:excelColWidth(h,records.map(r=>r[h]??''))}));
+  const ws=wb.addWorksheet(isPayroll?'Payroll':'SmartSheet Data',{
+   views:[{state:'frozen',ySplit:1,zoomScale:85,showGridLines:true}],
+   properties:{defaultRowHeight:24}
+  });
+  const fittedWidths=headers.map(h=>excelColWidth(h,records.map(r=>r[h]??'')));
+  ws.columns=headers.map((h,i)=>({header:String(h),key:String(h),width:fittedWidths[i]}));
   records.forEach(r=>ws.addRow(headers.map(h=>r[h]??'')));
-  ws.getRow(1).height=32;
+  const headerLines=Math.max(1,...headers.map((h,i)=>wrappedLines(h,fittedWidths[i])));
+  ws.getRow(1).height=Math.min(72,Math.max(34,headerLines*18+12));
   ws.getRow(1).eachCell(cell=>{
    cell.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF244A78'}};
@@ -164,10 +178,19 @@ async function downloadExcel(){
      cell.border={bottom:{style:'hair',color:{argb:'FFD6DEE8'}},left:{style:'thin',color:{argb:'FFE1E7EF'}},right:{style:'thin',color:{argb:'FFE1E7EF'}}};
      if(rowNumber%2===0)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF3F7FC'}};
     });
-    row.height=Math.min(90,Math.max(28,Math.ceil(maxLines*19+10)));
+    row.height=Math.min(110,Math.max(30,Math.ceil(maxLines*19+12)));
    }
   });
   ws.autoFilter={from:{row:1,column:1},to:{row:1,column:headers.length}};
+  ws.pageSetup={
+   orientation:'landscape',
+   fitToPage:true,
+   fitToWidth:1,
+   fitToHeight:0,
+   paperSize:9,
+   margins:{left:0.25,right:0.25,top:0.5,bottom:0.5,header:0.2,footer:0.2}
+  };
+  ws.properties.defaultColWidth=16;
   const buffer=await wb.xlsx.writeBuffer();
   save(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'SmartSheet-AI-Data.xlsx');
   $('status').textContent='Formatted Excel file created successfully.';
