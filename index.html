@@ -29,14 +29,14 @@ footer{text-align:center;color:#8390a8;padding:25px}
 </style>
 </head>
 <body><div class="container">
-<header><h1>⚡ SmartSheet AI</h1><p class="sub">AI Powered Automatic Excel Data Entry Platform</p></header>
-<section class="card"><h2>📂 Upload Your File</h2><input id="file" type="file" accept=".txt,.csv,.json,.xlsx,.xls"><p class="small">Starter version: TXT, CSV, JSON and Excel. PDF, Word and image OCR require an AI/OCR backend.</p></section>
+<header><h1>⚡ SmartSheet AI</h1><p class="sub">Smart Automatic Data Entry &amp; Excel Organizer</p></header>
+<section class="card"><h2>📂 Upload Your File</h2><input id="file" type="file" accept=".txt,.csv,.tsv,.json,.xlsx,.xls"><p class="small">Supported now: TXT, CSV, TSV, JSON and Excel. PDF, Word and image OCR need a separate AI/OCR backend. Category detection in this starter version uses built-in rules.</p></section>
 <section class="card"><h2>✍️ Paste Your Data</h2>
 <textarea id="data" placeholder="Paste tabular data, for example:
 Employee ID,Employee Name,Department,Basic Salary,HRA,Other Allowance,Deduction
 EMP101,Rahul Das,Sales,18000,3000,2000,500
 EMP102,Mina Roy,HR,22000,4000,1500,1000"></textarea>
-<p class="small">Paste rows with headings or simple comma-separated records without headings.</p>
+<p class="small">Paste rows with headings, comma/tab-separated records, JSON, or simple Field: Value lines.</p>
 <button onclick="analyze()">✨ Analyze Data</button><button class="secondary" onclick="clearAll()">Clear</button><p id="status">Ready to analyze your data.</p></section>
 <section class="card"><h2>📊 Automatic Category</h2><p id="category">Waiting for data...</p></section>
 <section class="card"><h2>📋 Excel Preview</h2><p class="small" id="hint">Your organized data will appear here.</p>
@@ -55,7 +55,23 @@ function parseCSV(text){
  const delim=lines[0].includes('\t')?'\t':',';
  return lines.map(line=>{let out=[],v='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){v+='"';i++;}else q=!q;}else if(c===delim&&!q){out.push(v.trim());v='';}else v+=c;}out.push(v.trim());return out;});
 }
-function detectCategory(s){s=s.toLowerCase();if(/employee|salary|designation|staff|hra|payroll|emp\d+/.test(s))return 'Employee Data Entry';if(/student|class|roll|school|marks/.test(s))return 'Student Information Entry';if(/patient|hospital|doctor|diagnosis/.test(s))return 'Hospital / Patient Records';if(/invoice|billing|gst/.test(s))return 'Invoice & Billing Entry';if(/product|stock|inventory|quantity/.test(s))return 'Inventory / Product Entry';if(/customer|phone|email|client/.test(s))return 'Customer Database Entry';if(/sales|purchase|order/.test(s))return 'Sales & Purchase Entry';if(/bank|transaction|debit|credit/.test(s))return 'Bank Statement Entry';return 'General Data Entry';}
+function detectCategory(s){
+ const t=String(s).toLowerCase();
+ // More specific categories are checked before broader employee/product/customer matches.
+ if(/attendance|payroll|present|absent|overtime|basic salary|gross salary|net salary|হাজিরা|বেতন/.test(t))return 'Attendance & Payroll';
+ if(/patient|hospital|doctor|diagnosis|prescription|বিষয়ী|রোগী|হাসপাতাল/.test(t))return 'Hospital / Patient Records';
+ if(/student|class|roll|school|marks|admission|শিক্ষার্থী|ছাত্র|ছাত্রী/.test(t))return 'Student Information Entry';
+ if(/invoice|billing|gst|tax invoice|bill no|রসিদ|বিল/.test(t))return 'Invoice & Billing Entry';
+ if(/bank statement|transaction|debit|credit|account balance|ifsc|লেনদেন|ব্যাংক/.test(t))return 'Bank Statement Entry';
+ if(/survey|questionnaire|response|feedback|প্রশ্নাবলী|জরিপ/.test(t))return 'Survey Data Entry';
+ if(/purchase|sales order|sale date|purchase date|vendor|supplier|ক্রয়|বিক্রয়/.test(t))return 'Sales & Purchase Entry';
+ if(/inventory|stock|warehouse|reorder|quantity in stock|মজুত/.test(t))return 'Inventory Management';
+ if(/product listing|sku|product name|product description|mrp|selling price|পণ্যের নাম/.test(t))return 'Product Listing';
+ if(/customer|client|customer id|phone|email|যোগাযোগ|গ্রাহক/.test(t))return 'Customer Database Entry';
+ if(/employee|salary|designation|staff|hra|emp\\d+|কর্মচারী/.test(t))return 'Employee Data Entry';
+ if(/accounting|ledger|journal|trial balance|accounts payable|accounts receivable|খতিয়ান|হিসাব/.test(t))return 'Accounting Records';
+ return 'General Data Entry';
+}
 function analyze(){
  const raw=$('data').value.trim();if(!raw){$('status').textContent='Please paste data or choose a file.';return;}
  try{
