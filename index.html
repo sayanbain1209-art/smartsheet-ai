@@ -29,6 +29,11 @@ button{background:#3478f6;color:white;border:0;padding:13px 18px;border-radius:9
 .quality-item{background:#0b1325;border:1px solid #35435c;border-radius:10px;padding:12px;min-width:0}
 .quality-value{font-size:22px;font-weight:bold;color:#91baff}
 .quality-label{font-size:12px;color:#aab3c8;line-height:1.4}
+.search-tools{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.search-tools input{flex:1;min-width:180px}
+.editable-cell{cursor:text;outline-offset:-2px}
+.editable-cell:focus{outline:2px solid #72a7ff;background:#182943}
+#duplicateNote{color:#aab3c8;line-height:1.5;margin:10px 0}
 @media(max-width:420px){.quality-grid{grid-template-columns:1fr 1fr}.quality-item:last-child{grid-column:1/-1}}
 .tablewrap{overflow:auto;margin-top:14px;border:1px solid #35435c;border-radius:10px;max-width:100%}
 table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;background:#0b1325;font-size:14px;table-layout:auto}
@@ -57,7 +62,7 @@ EMP102,Mina Roy,HR,22000,4000,1500,1000"></textarea>
 <section class="card"><h2>📊 Automatic Category</h2><p id="category">Waiting for data...</p></section>
 <section class="card"><h2>🔎 Data Quality Check</h2><div class="quality-grid"><div class="quality-item"><div class="quality-value" id="qualityRows">0</div><div class="quality-label">Data rows</div></div><div class="quality-item"><div class="quality-value" id="qualityColumns">0</div><div class="quality-label">Source columns</div></div><div class="quality-item"><div class="quality-value" id="qualityMissing">0</div><div class="quality-label">Empty source cells</div></div></div><p class="calc-note" id="qualityNote">Analyze data to check for missing values.</p></section>
 <section class="card"><h2>📋 Excel Preview</h2><p class="small" id="hint">Your organized data will appear here.</p>
-<div class="tablewrap"><table id="preview"><thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody></table></div>
+<div class="search-tools"><input id="tableSearch" type="search" placeholder="🔎 Search all columns..." aria-label="Search table"><button class="secondary" onclick="removeDuplicates()">Remove Exact Duplicates</button></div><p id="duplicateNote">Duplicate check will appear after analysis. Tap a source cell to edit it.</p><div class="tablewrap"><table id="preview"><thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody></table></div>
 <button onclick="autoFitAll()">↔ AutoFit All</button><button class="secondary" onclick="autoFitColumns()">AutoFit Column Width</button><button class="secondary" onclick="autoFitRows()">AutoFit Row Height</button><button class="secondary" onclick="autoFitText()">AutoFit Cell Text</button>
 <br><button onclick="downloadExcel()">⬇ Download Formatted Excel (.xlsx)</button><button class="secondary" onclick="downloadCSV()">Download CSV</button>
 </section><footer>SmartSheet AI • Automatic Data Entry</footer></div>
@@ -234,7 +239,28 @@ $('autoCalc').addEventListener('change',()=>{
  if(records.length){applyGlobalCalculations();updateQualitySummary();render();autoFitAll();$('hint').textContent=$('autoCalc').checked?'Automatic calculations are ON. Missing required values stay blank. Student default grade scale: A+ ≥90, A ≥80, B ≥70, C ≥60, D ≥50; Pass ≥33%. Confirm these rules suit your school.':'Automatic calculations are OFF. Original source data is shown without calculated columns.';$('status').textContent='Calculation setting updated.';}
 });
 function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function render(){$('preview').innerHTML='<thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+records.map(r=>'<tr>'+headers.map(h=>'<td>'+esc(r[h]??'')+'</td>').join('')+'</tr>').join('')+'</tbody>';}
+function rowSignature(r){return sourceHeaders.map(h=>String(r[h]??'').trim().toLowerCase()).join('\u001f');}
+function duplicateStats(){const seen=new Set();let duplicateRows=0;records.forEach(r=>{const sig=rowSignature(r);if(seen.has(sig))duplicateRows++;else seen.add(sig);});return {unique:seen.size,duplicateRows};}
+function render(){
+ const query=String($('tableSearch')?.value||'').trim().toLowerCase();
+ const visible=records.map((r,index)=>({r,index})).filter(x=>!query||headers.some(h=>String(x.r[h]??'').toLowerCase().includes(query)));
+ $('preview').innerHTML='<thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+visible.map(({r,index})=>'<tr>'+headers.map(h=>'<td '+(sourceHeaders.includes(h)?'contenteditable="true" spellcheck="false" class="editable-cell" data-row="'+index+'" data-col="'+esc(h)+'" title="Tap to edit"':'')+'>'+esc(r[h]??'')+'</td>').join('')+'</tr>').join('')+'</tbody>';
+ const d=duplicateStats();$('duplicateNote').textContent=`${d.duplicateRows} exact duplicate row(s) found • ${d.unique} unique source record(s). Source cells are editable; calculated cells are read-only.`+(query?` Showing ${visible.length} of ${records.length} rows.`:'');
+}
+$('tableSearch').addEventListener('input',render);
+$('preview').addEventListener('focusout',e=>{
+ const cell=e.target.closest('td.editable-cell');if(!cell)return;
+ const index=Number(cell.dataset.row),column=cell.dataset.col;if(!Number.isInteger(index)||!sourceRecords[index])return;
+ const value=cell.textContent;sourceRecords[index][column]=value;
+ applyGlobalCalculations();updateQualitySummary();render();autoFitAll();$('status').textContent='Cell updated. Calculations and quality check refreshed.';
+});
+function removeDuplicates(){
+ if(!sourceRecords.length)return $('status').textContent='Analyze data first.';
+ const seen=new Set();let removed=0;
+ sourceRecords=sourceRecords.filter(r=>{const sig=rowSignature(r);if(seen.has(sig)){removed++;return false;}seen.add(sig);return true;});
+ if(!removed){$('status').textContent='No exact duplicate rows found.';return;}
+ applyGlobalCalculations();updateQualitySummary();render();autoFitAll();$('status').textContent=`Removed ${removed} exact duplicate row(s).`;
+}
 function displayWidth(value){
  const s=String(value??'');let width=0;
  for(const ch of s){width+=(/[^\u0000-\u00ff]/.test(ch)?1.8:1);}
@@ -357,6 +383,6 @@ async function downloadExcel(){
   $('status').textContent='Formatted Excel file created successfully.';
  }catch(err){$('status').textContent='Excel export failed: '+err.message;}
 }
-function clearAll(){headers=[];records=[];sourceHeaders=[];sourceRecords=[];isPayroll=false;detectedCategory='General Data Entry';$('autoCalc').checked=true;$('calcState').textContent='ON';$('data').value='';autoFitEntryText();$('file').value='';$('category').textContent='Waiting for data...';$('qualityRows').textContent='0';$('qualityColumns').textContent='0';$('qualityMissing').textContent='0';$('qualityNote').textContent='Analyze data to check for missing values.';$('status').textContent='Ready to analyze your data.';$('hint').textContent='Your organized data will appear here.';$('preview').innerHTML='<thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody>';}
+function clearAll(){headers=[];records=[];sourceHeaders=[];sourceRecords=[];isPayroll=false;detectedCategory='General Data Entry';$('autoCalc').checked=true;$('calcState').textContent='ON';$('tableSearch').value='';$('duplicateNote').textContent='Duplicate check will appear after analysis. Tap a source cell to edit it.';$('data').value='';autoFitEntryText();$('file').value='';$('category').textContent='Waiting for data...';$('qualityRows').textContent='0';$('qualityColumns').textContent='0';$('qualityMissing').textContent='0';$('qualityNote').textContent='Analyze data to check for missing values.';$('status').textContent='Ready to analyze your data.';$('hint').textContent='Your organized data will appear here.';$('preview').innerHTML='<thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody>';}
 $('file').addEventListener('change',async e=>{let f=e.target.files[0];if(!f)return;try{if(/\.(xlsx|xls)$/i.test(f.name)){if(!window.XLSX)throw Error('Excel reader not loaded.');let wb=XLSX.read(await f.arrayBuffer());let rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows.length)throw Error('No data found in workbook.');$('data').value=JSON.stringify(rows,null,2);analyze();}else{$('data').value=await f.text();analyze();}}catch(err){$('status').textContent=err.message;}});
 </script></body></html>
