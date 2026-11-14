@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartSheet AI</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1020;color:#f4f6ff;font-family:Arial,sans-serif;padding:16px}
+.container{max-width:1100px;margin:auto}
+header{text-align:center;padding:20px 0}
+h1{font-size:clamp(27px,5vw,34px);color:#72a7ff;margin:8px}
+.sub,.small{color:#aab3c8;line-height:1.55}
+.card{background:#151e32;border:1px solid #293752;border-radius:16px;padding:20px;margin:16px 0;min-width:0}
+h2{font-size:20px;margin:0 0 14px}
+textarea,input[type=file]{width:100%;background:#0b1325;color:white;border:1px solid #40516f;border-radius:10px;padding:13px;font-size:16px}
+textarea{min-height:170px;resize:vertical;line-height:1.5;overflow-y:hidden}
+/* Text AutoFit: keep entered text readable and contained in its cell */
+#preview th,#preview td{white-space:normal;overflow-wrap:anywhere;word-break:normal;text-overflow:clip}
+#preview td{height:auto;vertical-align:middle}
+button{background:#3478f6;color:white;border:0;padding:13px 18px;border-radius:9px;font-size:15px;font-weight:bold;margin:10px 8px 0 0;cursor:pointer}
+.secondary{background:#35435c}
+#status{color:#91baff;line-height:1.5}
+.calc-control{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;background:#0b1325;border:1px solid #40516f;border-radius:12px;padding:13px 15px;margin:12px 0}
+.calc-control label{display:flex;align-items:center;gap:10px;font-weight:bold}
+.calc-control input{width:20px;height:20px;accent-color:#3478f6}
+.calc-note{color:#aab3c8;font-size:13px;line-height:1.5;margin:8px 0 0}
+.quality-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.quality-item{background:#0b1325;border:1px solid #35435c;border-radius:10px;padding:12px;min-width:0}
+.quality-value{font-size:22px;font-weight:bold;color:#91baff}
+.quality-label{font-size:12px;color:#aab3c8;line-height:1.4}
+.search-tools{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.search-tools input{flex:1;min-width:180px}
+.editable-cell{cursor:text;outline-offset:-2px}
+.editable-cell:focus{outline:2px solid #72a7ff;background:#182943}
+#duplicateNote{color:#aab3c8;line-height:1.5;margin:10px 0}
+@media(max-width:420px){.quality-grid{grid-template-columns:1fr 1fr}.quality-item:last-child{grid-column:1/-1}}
+.tablewrap{overflow:auto;margin-top:14px;border:1px solid #35435c;border-radius:10px;max-width:100%}
+table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;background:#0b1325;font-size:14px;table-layout:auto}
+th,td{border-right:1px solid #35435c;border-bottom:1px solid #35435c;padding:12px 16px;text-align:left;vertical-align:middle;white-space:normal;overflow-wrap:anywhere;word-break:normal;line-height:1.45;min-width:120px;max-width:420px}
+th{background:#263b60;font-weight:700;position:sticky;top:0;z-index:1}
+th:last-child,td:last-child{border-right:0}
+tbody tr:last-child td{border-bottom:0}
+footer{text-align:center;color:#8390a8;padding:25px}
+@media(max-width:600px){body{padding:10px}.card{padding:14px}button{padding:12px 14px}th,td{padding:11px 14px;min-width:120px;max-width:320px}}
+</style>
+</head>
+<body><div class="container">
+<header><h1>⚡ SmartSheet AI</h1><p class="sub">Smart Automatic Data Entry &amp; Excel Organizer</p></header>
+<section class="card"><h2>📂 Upload Your File</h2><input id="file" type="file" accept=".txt,.csv,.tsv,.json,.xlsx,.xls"><p class="small">Supported now: TXT, CSV, TSV, JSON and Excel. PDF, Word and image OCR need a separate AI/OCR backend. Category detection in this starter version uses built-in rules.</p></section>
+<section class="card"><h2>✍️ Paste Your Data</h2>
+<textarea id="data" placeholder="Paste tabular data, for example:
+Employee ID,Employee Name,Department,Basic Salary,HRA,Other Allowance,Deduction
+EMP101,Rahul Das,Sales,18000,3000,2000,500
+EMP102,Mina Roy,HR,22000,4000,1500,1000"></textarea>
+<p class="small">Paste rows with headings (comma, tab or semicolon separated), quoted text, JSON, or simple Field: Value lines.</p>
+<button onclick="analyze()">✨ Analyze Data</button><button class="secondary" onclick="clearAll()">Clear</button><p id="status" aria-live="polite">Ready to analyze your data.</p></section>
+<section class="card"><h2>🧮 Global Auto Calculation</h2>
+<div class="calc-control"><label for="autoCalc"><input id="autoCalc" type="checkbox" checked> Enable automatic calculations</label><span id="calcState">ON</span></div>
+<p class="calc-note">ON: calculate supported fields when the required source columns are available. OFF: keep and organize the original data without adding calculation columns.</p>
+</section>
+<section class="card" id="instructionCard">
+<h2>🤖 Smart Instructions</h2>
+<p class="small">নিজের ভাষায় কাজের নির্দেশ লিখুন। SmartSheet AI আগে কী করবে তা দেখাবে; আপনার অনুমতি ছাড়া ডেটা বদলাবে না।</p>
+<textarea id="instructionInput" style="min-height:90px" placeholder="উদাহরণ: নাম অনুযায়ী সাজিয়ে দাও / Sort by Name A to Z / Remove duplicate rows"></textarea>
+<button onclick="understandInstruction()">✨ বুঝে নাও</button>
+<button class="secondary" onclick="cancelInstruction()">Cancel</button>
+<p id="instructionStatus" class="small" aria-live="polite">এখনও কোনো নির্দেশ বিশ্লেষণ করা হয়নি।</p>
+<div id="instructionPreview" class="small" style="display:none;background:#0b1325;border:1px solid #40516f;border-radius:10px;padding:12px;margin-top:10px"></div>
+<button id="applyInstructionBtn" style="display:none" onclick="applyInstruction()">✓ অনুমতি দিন ও কাজ করুন</button>
+</section>
+<section class="card"><h2>📊 Automatic Category</h2><p id="category">Waiting for data...</p></section>
+<section class="card"><h2>🔎 Data Quality Check</h2><div class="quality-grid"><div class="quality-item"><div class="quality-value" id="qualityRows">0</div><div class="quality-label">Data rows</div></div><div class="quality-item"><div class="quality-value" id="qualityColumns">0</div><div class="quality-label">Source columns</div></div><div class="quality-item"><div class="quality-value" id="qualityMissing">0</div><div class="quality-label">Empty source cells</div></div></div><p class="calc-note" id="qualityNote">Analyze data to check for missing values.</p></section>
+<section class="card"><h2>📋 Excel Preview</h2><p class="small" id="hint">Your organized data will appear here.</p>
+<div class="search-tools"><input id="tableSearch" type="search" placeholder="🔎 Search all columns..." aria-label="Search table"><button class="secondary" onclick="removeDuplicates()">Remove Exact Duplicates</button></div><p id="duplicateNote">Duplicate check will appear after analysis. Tap a source cell to edit it.</p><div class="tablewrap"><table id="preview"><thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody></table></div>
+<button onclick="autoFitAll()">↔ AutoFit All</button><button class="secondary" onclick="autoFitColumns()">AutoFit Column Width</button><button class="secondary" onclick="autoFitRows()">AutoFit Row Height</button><button class="secondary" onclick="autoFitText()">AutoFit Cell Text</button>
+<br><button onclick="downloadExcel()">⬇ Download Formatted Excel (.xlsx)</button><button class="secondary" onclick="downloadCSV()">Download CSV</button>
+</section><footer>SmartSheet AI • Automatic Data Entry</footer></div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script>
+let headers=[],records=[],sourceHeaders=[],sourceRecords=[],isPayroll=false,detectedCategory='General Data Entry';
+const $=id=>document.getElementById(id);
+function norm(s){return String(s).toLowerCase().replace(/[^a-z0-9]/g,'');}
+function detectDelimiter(text){
+ const first=(text.split(/\r?\n/,1)[0]||'');
+ const candidates=[',','\t',';'];let best=',',bestCount=-1;
+ for(const d of candidates){let count=0,quoted=false;for(let i=0;i<first.length;i++){const c=first[i];if(c==='"'){if(quoted&&first[i+1]==='"')i++;else quoted=!quoted;}else if(c===d&&!quoted)count++;}if(count>bestCount){best=d;bestCount=count;}}
+ return best;
+}
+function parseCSV(text){
+ const input=String(text??'').replace(/^\uFEFF/,'');if(!input.trim())return [];
+ const delim=detectDelimiter(input),rows=[];let row=[],value='',quoted=false;
+ for(let i=0;i<input.length;i++){
+  const c=input[i];
+  if(c==='"'){
+   if(quoted&&input[i+1]==='"'){value+='"';i++;}
+   else quoted=!quoted;
+  }else if(c===delim&&!quoted){row.push(value.trim());value='';}
+  else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&input[i+1]==='\n')i++;row.push(value.trim());if(row.some(v=>v!==''))rows.push(row);row=[];value='';}
+  else value+=c;
+ }
+ row.push(value.trim());if(row.some(v=>v!==''))rows.push(row);
+ if(quoted)throw Error('A quoted CSV field is not closed. Check quotation marks.');
+ return rows;
+}
+function uniqueHeaders(values){
+ const seen=new Map();return values.map((v,i)=>{let name=String(v??'').trim()||`Column ${i+1}`;const count=(seen.get(name)||0)+1;seen.set(name,count);return count===1?name:`${name} (${count})`;});
+}
+function detectCategory(s){
+ const t=String(s).toLowerCase();
+ if(/attendance|payroll|present|absent|overtime|basic salary|gross salary|net salary|হাজিরা|বেতন/.test(t))return 'Attendance & Payroll';
+ if(/patient|hospital|doctor|diagnosis|prescription|বিষয়ী|রোগী|হাসপাতাল/.test(t))return 'Hospital / Patient Records';
+ if(/student|class|roll|school|marks|admission|শিক্ষার্থী|ছাত্র|ছাত্রী/.test(t))return 'Student Information Entry';
+ if(/invoice|billing|gst|tax invoice|bill no|রসিদ|বিল/.test(t))return 'Invoice & Billing Entry';
+ if(/bank statement|transaction|debit|credit|account balance|ifsc|লেনদেন|ব্যাংক/.test(t))return 'Bank Statement Entry';
+ if(/survey|questionnaire|response|feedback|প্রশ্নাবলী|জরিপ/.test(t))return 'Survey Data Entry';
+ if(/purchase|sales|sale date|purchase date|vendor|supplier|order id|ক্রয়|বিক্রয়/.test(t))return 'Sales & Purchase Entry';
+ if(/inventory|stock|warehouse|reorder|quantity in stock|মজুত/.test(t))return 'Inventory Management';
+ if(/product listing|sku|product name|product description|mrp|selling price|পণ্যের নাম/.test(t))return 'Product Listing';
+ if(/customer|client|customer id|phone|email|যোগাযোগ|গ্রাহক/.test(t))return 'Customer Database Entry';
+ if(/employee|salary|designation|staff|hra|emp\d+|কর্মচারী/.test(t))return 'Employee Data Entry';
+ if(/accounting|ledger|journal|trial balance|accounts payable|accounts receivable|খতিয়ান|হিসাব/.test(t))return 'Accounting Records';
+ return 'General Data Entry';
+}
+function analyze(){
+ const raw=$('data').value.trim();if(!raw){$('status').textContent='Please paste data or choose a file.';return;}
+ try{
+  if(raw.startsWith('{')||raw.startsWith('[')){let j=JSON.parse(raw);records=Array.isArray(j)?j:[j];headers=uniqueHeaders([...new Set(records.flatMap(o=>Object.keys(o)))]);}
+  else{
+   const rows=parseCSV(raw);
+   if(rows.length && rows[0].length>1){
+    const first=uniqueHeaders(rows[0]);
+    const looksLikeEmployeeRecord=/^emp\d+$/i.test(first[0]) && first.length>=3;
+    if(looksLikeEmployeeRecord){
+     headers=first.length===4?['Employee ID','Employee Name','City','Phone']:first.map((_,i)=>['Employee ID','Employee Name','City','Phone'][i]||`Field ${i+1}`);
+     records=rows.filter(r=>r.some(v=>v!=='')).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));
+    }else{
+     headers=first;records=rows.slice(1).filter(r=>r.some(v=>v!=='')).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));
+    }
+   }else{
+    const obj={};raw.split(/\r?\n/).forEach(line=>{let m=line.match(/^([^:：]+)\s*[:：]\s*(.*)$/);if(m)obj[m[1].trim()]=m[2].trim();});
+    headers=Object.keys(obj);records=Object.keys(obj).length?[obj]:[];
+   }
+  }
+  if(!headers.length||!records.length)throw Error('No data rows found. Check the headings and rows.');
+  detectedCategory=detectCategory(headers.join(' ')+' '+raw);
+  const all=Object.keys(records[0]).map(norm);
+  const hasEmployee=all.some(k=>['employeeid','empid','employeename','employee','staffname'].includes(k));
+  const hasPay=all.some(k=>['basicsalary','basic','basicpay','hra','salary','deduction','totaldeduction','otherallowance'].includes(k));
+  isPayroll=hasEmployee&&hasPay;
+  sourceHeaders=headers.slice();sourceRecords=records.map(r=>({...r}));
+  applyGlobalCalculations();updateQualitySummary();
+  $('category').textContent=detectedCategory;
+  $('hint').textContent=$('autoCalc').checked
+   ? 'Automatic calculations are ON. Missing required values stay blank. Student default scale: A+ ≥90, A ≥80, B ≥70, C ≥60, D ≥50; Pass ≥33%. Confirm these grading rules suit your school.'
+   : 'Automatic calculations are OFF. Your original source data is arranged without adding calculated columns.';
+  render();autoFitAll();
+  const blankRows=records.filter(r=>Object.values(r).every(v=>String(v??'').trim()==='')).length;
+  $('status').textContent=`Analysis complete: ${records.length} record(s), ${headers.length} columns.`+(blankRows?` ${blankRows} empty row(s) ignored.`:'');
+ }catch(e){$('status').textContent='Could not analyze: '+e.message;}
+}
+function updateQualitySummary(){
+ const rows=sourceRecords.length,cols=sourceHeaders.length;let missing=0;
+ sourceRecords.forEach(r=>sourceHeaders.forEach(h=>{if(String(r[h]??'').trim()==='')missing++;}));
+ $('qualityRows').textContent=rows;$('qualityColumns').textContent=cols;$('qualityMissing').textContent=missing;
+ $('qualityNote').textContent=rows? (missing?`${missing} empty cell(s) found in your original data. Check them before using calculations.`:'No empty source cells found.'):'Analyze data to check for missing values.';
+}
+function findKey(obj,names){return Object.keys(obj).find(k=>names.includes(norm(k)));}
+function num(v){
+ if(v===null||v===undefined||String(v).trim()==='')return null;
+ const cleaned=String(v).replace(/[₹,$,\s%]/g,'').replace(/,/g,'');
+ const n=Number(cleaned);return Number.isFinite(n)?n:null;
+}
+function sumAvailable(r,keys){let total=0,found=false;for(const k of keys){const n=num(r[k]);if(n!==null){total+=n;found=true;}}return found?total:null;}
+function setCalculatedColumn(name,fn){
+ // Never overwrite a column supplied by the user.
+ if(sourceHeaders.includes(name))return;
+ if(!headers.includes(name))headers.push(name);
+ for(const r of records){const value=fn(r);r[name]=value===null||value===undefined?'':(Number.isFinite(value)?Math.round((value+Number.EPSILON)*100)/100:value);}
+}
+function applyGlobalCalculations(){
+ // Always start from a clean copy of imported data. This preserves user columns
+ // even when their names match calculated-field labels and makes ON/OFF reversible.
+ headers=sourceHeaders.slice();records=sourceRecords.map(r=>({...r}));
+ if(!$('autoCalc').checked)return;
+ const keys=Object.keys(records[0]||{}), key=(names)=>findKey(records[0]||{},names);
+ const category=detectedCategory;
+ // Payroll / employee: calculate only when at least one salary component is present.
+ const basic=key(['basicsalary','basic','basicpay']),hra=key(['hra','houserentallowance']),other=key(['otherallowance','allowance','otherallowances']),ot=key(['overtimeamount','otamount','overtime']),ded=key(['totaldeduction','deduction','deductions']);
+ if(isPayroll || category==='Attendance & Payroll' || category==='Employee Data Entry'){
+  if(basic||hra||other||ot){
+   const salaryParts=[basic,hra,other,ot].filter(Boolean);
+   setCalculatedColumn('Gross Salary',r=>{const vals=salaryParts.map(k=>num(r[k]));return vals.length&&vals.every(v=>v!==null)?vals.reduce((a,v)=>a+v,0):null;});
+   // Keep an existing Deduction/Total Deduction input column; do not create a duplicate.
+   if(ded)setCalculatedColumn('Net Salary',r=>{const g=num(r['Gross Salary']),d=num(r[ded]);return g!==null&&d!==null?g-d:null;});
+  }
+ }
+ // Student marks: subject obtained/full-mark pairs must be identifiable from headings.
+ if(category==='Student Information Entry'){
+  const subjectPairs=[];
+  for(const h of keys){
+   const n=norm(h);
+   if(/(fullmarks|maxmarks|outof|totalmarks)$/.test(n)){
+    const base=n.replace(/(fullmarks|maxmarks|outof|totalmarks)$/,'');
+    const mark=keys.find(k=>{const kn=norm(k);return kn===base+'marks'||kn===base+'obtained'||kn===base+'score'||kn===base;});
+    if(mark&&mark!==h)subjectPairs.push({mark,full:h});
+   }
+  }
+  if(subjectPairs.length){
+   setCalculatedColumn('Total Marks',r=>sumAvailable(r,subjectPairs.map(p=>p.mark)));
+   setCalculatedColumn('Total Full Marks',r=>sumAvailable(r,subjectPairs.map(p=>p.full)));
+   setCalculatedColumn('Percentage',r=>{const a=num(r['Total Marks']),b=num(r['Total Full Marks']);return a!==null&&b>0?a/b*100:null;});
+   setCalculatedColumn('Grade',r=>{const p=num(r['Percentage']);return p===null?'':p>=90?'A+':p>=80?'A':p>=70?'B':p>=60?'C':p>=50?'D':'F';});
+   setCalculatedColumn('Result',r=>{const p=num(r['Percentage']);return p===null?'':p>=33?'Pass':'Fail';});
+  }
+ }
+ // Sales, purchase and invoice: quantity x unit price; tax is calculated only from an explicit tax rate.
+ if(['Sales & Purchase Entry','Invoice & Billing Entry'].includes(category)){
+  const qty=key(['quantity','qty','units']),rate=key(['unitprice','priceperunit','rate','sellingprice','price']),taxRate=key(['taxrate','gstrate','taxpercent','gstpercent']),taxAmount=key(['taxamount','gstamount','tax']);
+  if(qty&&rate){
+   setCalculatedColumn('Subtotal',r=>{const q=num(r[qty]),p=num(r[rate]);return q!==null&&p!==null?q*p:null;});
+   if(taxRate)setCalculatedColumn('Tax Amount',r=>{const sub=num(r['Subtotal']),t=num(r[taxRate]);return sub!==null&&t!==null?sub*t/100:null;});
+   if(taxRate||taxAmount)setCalculatedColumn('Grand Total',r=>{const sub=num(r['Subtotal']);const tax=taxRate?(sub!==null&&num(r[taxRate])!==null?sub*num(r[taxRate])/100:null):num(r[taxAmount]);return sub!==null&&tax!==null?sub+tax:null;});
+  }
+ }
+ // Inventory/product value: stock quantity x unit cost/price.
+ if(['Inventory Management','Product Listing'].includes(category)){
+  const qty=key(['quantityinstock','stockquantity','quantity','qty','currentstock']),price=key(['unitcost','unitprice','costprice','sellingprice','price','mrp']);
+  if(qty&&price)setCalculatedColumn('Stock Value',r=>{const q=num(r[qty]),p=num(r[price]);return q!==null&&p!==null?q*p:null;});
+  const received=key(['receivedstock','stockreceived','quantityreceived']),sold=key(['soldquantity','quantitysold','sold']);
+  if(received&&sold)setCalculatedColumn('Remaining Stock',r=>{const a=num(r[received]),b=num(r[sold]);return a!==null&&b!==null?a-b:null;});
+ }
+ // Attendance: derive days and percentage from explicit day counts.
+ if(category==='Attendance & Payroll' || keys.some(k=>/attendance|present|absent/i.test(k))){
+  const present=key(['presentdays','dayspresent','present']),absent=key(['absentdays','daysabsent','absent']),working=key(['workingdays','totalworkingdays','totaldays']);
+  if(present)setCalculatedColumn('Present Days',r=>num(r[present]));
+  if(absent)setCalculatedColumn('Absent Days',r=>num(r[absent]));
+  if(present&&working)setCalculatedColumn('Attendance %',r=>{const p=num(r[present]),w=num(r[working]);return p!==null&&w>0?p/w*100:null;});
+ }
+ // Bank/accounting balance only when opening balance and debit/credit fields are explicit.
+ if(category==='Bank Statement Entry' || category==='Accounting Records'){
+  const opening=key(['openingbalance','openingbal']),debit=key(['debit','withdrawal','withdrawals']),credit=key(['credit','deposit','deposits']);
+  if(opening&&debit&&credit)setCalculatedColumn('Calculated Balance',r=>{const o=num(r[opening]),c=num(r[credit]),d=num(r[debit]);return o!==null&&c!==null&&d!==null?o+c-d:null;});
+ }
+}
+$('autoCalc').addEventListener('change',()=>{
+ $('calcState').textContent=$('autoCalc').checked?'ON':'OFF';
+ if(records.length){applyGlobalCalculations();updateQualitySummary();render();autoFitAll();$('hint').textContent=$('autoCalc').checked?'Automatic calculations are ON. Missing required values stay blank. Student default grade scale: A+ ≥90, A ≥80, B ≥70, C ≥60, D ≥50; Pass ≥33%. Confirm these rules suit your school.':'Automatic calculations are OFF. Original source data is shown without calculated columns.';$('status').textContent='Calculation setting updated.';}
+});
+function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function rowSignature(r){return sourceHeaders.map(h=>String(r[h]??'').trim().toLowerCase()).join('\u001f');}
+function duplicateStats(){const seen=new Set();let duplicateRows=0;records.forEach(r=>{const sig=rowSignature(r);if(seen.has(sig))duplicateRows++;else seen.add(sig);});return {unique:seen.size,duplicateRows};}
+function render(){
+ const query=String($('tableSearch')?.value||'').trim().toLowerCase();
+ const visible=records.map((r,index)=>({r,index})).filter(x=>!query||headers.some(h=>String(x.r[h]??'').toLowerCase().includes(query)));
+ $('preview').innerHTML='<thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+visible.map(({r,index})=>'<tr>'+headers.map(h=>'<td '+(sourceHeaders.includes(h)?'contenteditable="true" spellcheck="false" class="editable-cell" data-row="'+index+'" data-col="'+esc(h)+'" title="Tap to edit"':'')+'>'+esc(r[h]??'')+'</td>').join('')+'</tr>').join('')+'</tbody>';
+ const d=duplicateStats();$('duplicateNote').textContent=`${d.duplicateRows} exact duplicate row(s) found • ${d.unique} unique source record(s). Source cells are editable; calculated cells are read-only.`+(query?` Showing ${visible.length} of ${records.length} rows.`:'');
+}
+$('tableSearch').addEventListener('input',render);
+$('preview').addEventListener('focusout',e=>{
+ const cell=e.target.closest('td.editable-cell');if(!cell)return;
+ const index=Number(cell.dataset.row),column=cell.dataset.col;if(!Number.isInteger(index)||!sourceRecords[index])return;
+ const value=cell.textContent;sourceRecords[index][column]=value;
+ applyGlobalCalculations();updateQualitySummary();render();autoFitAll();$('status').textContent='Cell updated. Calculations and quality check refreshed.';
+});
+function removeDuplicates(){
+ if(!sourceRecords.length)return $('status').textContent='Analyze data first.';
+ const seen=new Set();let removed=0;
+ sourceRecords=sourceRecords.filter(r=>{const sig=rowSignature(r);if(seen.has(sig)){removed++;return false;}seen.add(sig);return true;});
+ if(!removed){$('status').textContent='No exact duplicate rows found.';return;}
+ applyGlobalCalculations();updateQualitySummary();render();autoFitAll();$('status').textContent=`Removed ${removed} exact duplicate row(s).`;
+}
+function displayWidth(value){
+ const s=String(value??'');let width=0;
+ for(const ch of s){width+=(/[^\u0000-\u00ff]/.test(ch)?1.8:1);}
+ return width;
+}
+function autoFitColumns(){
+ if(!records.length)return;
+ const table=$('preview');
+ [...table.querySelectorAll('thead th')].forEach((th,i)=>{
+  let max=displayWidth(headers[i]??'');
+  records.forEach(r=>{max=Math.max(max,displayWidth(r[headers[i]]??''));});
+  const px=Math.max(140,Math.min(420,Math.ceil(max*8.2+42)));
+  th.style.width=px+'px';th.style.minWidth=px+'px';th.style.maxWidth='none';
+  table.querySelectorAll('tbody tr').forEach(tr=>{if(tr.children[i]){tr.children[i].style.width=px+'px';tr.children[i].style.minWidth=px+'px';tr.children[i].style.maxWidth='none';}});
+ });
+}
+function autoFitRows(){
+ $('preview').querySelectorAll('th,td').forEach(cell=>{
+  cell.style.height='auto';cell.style.whiteSpace='normal';cell.style.overflowWrap='anywhere';
+  cell.style.wordBreak='normal';cell.style.lineHeight='1.5';cell.style.padding='13px 17px';
+ });
+}
+function autoFitText(){
+ // Fit long entered values inside cells: wrap text, grow row height, and
+ // gently reduce font size for unusually long cell contents (never below 10px).
+ $('preview').querySelectorAll('th,td').forEach(cell=>{
+  const length=displayWidth(cell.textContent||'');
+  let size=14;
+  if(length>150)size=10;
+  else if(length>110)size=10.5;
+  else if(length>75)size=11;
+  else if(length>45)size=12;
+  else if(length>28)size=13;
+  cell.style.fontSize=size+'px';
+  cell.style.whiteSpace='normal';
+  cell.style.overflowWrap='anywhere';
+  cell.style.wordBreak='normal';
+  cell.style.textOverflow='clip';
+  cell.style.height='auto';
+  cell.style.lineHeight='1.45';
+ });
+}
+function autoFitAll(){autoFitColumns();autoFitRows();autoFitText();}
+// Automatically expand the data-entry box as the user types or pastes text.
+function autoFitEntryText(){
+ const box=$('data');if(!box)return;
+ box.style.height='auto';
+ box.style.height=Math.min(Math.max(box.scrollHeight,170),520)+'px';
+ box.style.overflowY=box.scrollHeight>520?'auto':'hidden';
+}
+$('data').addEventListener('input',autoFitEntryText);
+$('data').addEventListener('paste',()=>setTimeout(autoFitEntryText,0));
+function csv(){return [headers,...records.map(r=>headers.map(h=>r[h]??''))].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');}
+function save(blob,name){let a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);}
+function downloadCSV(){if(!records.length)return $('status').textContent='Analyze data first.';save(new Blob(['\ufeff'+csv()],{type:'text/csv;charset=utf-8'}),'SmartSheet-AI-Data.csv');}
+function longestWordWidth(value){
+ const words=String(value??'').split(/\s+/).filter(Boolean);
+ return Math.max(0,...words.map(displayWidth));
+}
+function excelColWidth(header,values){
+ // Balance the full text length with the longest unbroken word.
+ // This avoids extremely wide columns while keeping headings readable.
+ const all=[header,...values].map(v=>String(v??''));
+ const full=Math.max(0,...all.map(displayWidth));
+ const word=Math.max(0,...all.map(longestWordWidth));
+ return Math.max(14,Math.min(34,Math.ceil(Math.max(word+2,full*0.58+3))));
+}
+function wrappedLines(value,width){
+ const text=String(value??'').trim();if(!text)return 1;
+ const usable=Math.max(8,width-2);
+ return Math.max(1,Math.ceil(displayWidth(text)/usable));
+}
+async function downloadExcel(){
+ if(!records.length)return $('status').textContent='Analyze data first.';
+ if(!window.ExcelJS)return $('status').textContent='Excel formatting library did not load. Check internet and retry.';
+ try{
+  autoFitAll();
+  const wb=new ExcelJS.Workbook();
+  wb.creator='SmartSheet AI';wb.subject='Automatically organized data';wb.created=new Date();
+  const ws=wb.addWorksheet(isPayroll?'Payroll':'SmartSheet Data',{
+   views:[{state:'frozen',ySplit:1,zoomScale:85,showGridLines:true}],
+   properties:{defaultRowHeight:24}
+  });
+  const fittedWidths=headers.map(h=>excelColWidth(h,records.map(r=>r[h]??'')));
+  ws.columns=headers.map((h,i)=>({header:String(h),key:String(h),width:fittedWidths[i]}));
+  records.forEach(r=>ws.addRow(headers.map(h=>r[h]??'')));
+  const headerLines=Math.max(1,...headers.map((h,i)=>wrappedLines(h,fittedWidths[i])));
+  ws.getRow(1).height=Math.min(72,Math.max(34,headerLines*18+12));
+  ws.getRow(1).eachCell(cell=>{
+   cell.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
+   cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF244A78'}};
+   cell.alignment={vertical:'middle',horizontal:'left',wrapText:true,indent:1};
+   cell.border={top:{style:'thin',color:{argb:'FFB8C7D9'}},left:{style:'thin',color:{argb:'FFB8C7D9'}},bottom:{style:'thin',color:{argb:'FFB8C7D9'}},right:{style:'thin',color:{argb:'FFB8C7D9'}}};
+  });
+  ws.eachRow((row,rowNumber)=>{
+   if(rowNumber>1){
+    let maxLines=1;
+    row.eachCell((cell,colNumber)=>{
+     const width=ws.getColumn(colNumber).width;
+     maxLines=Math.max(maxLines,wrappedLines(cell.value,width));
+     cell.alignment={vertical:'middle',horizontal:typeof cell.value==='number'?'right':'left',wrapText:true,indent:1};
+     cell.border={bottom:{style:'hair',color:{argb:'FFD6DEE8'}},left:{style:'thin',color:{argb:'FFE1E7EF'}},right:{style:'thin',color:{argb:'FFE1E7EF'}}};
+     if(rowNumber%2===0)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF3F7FC'}};
+    });
+    row.height=Math.min(110,Math.max(30,Math.ceil(maxLines*19+12)));
+   }
+  });
+  ws.autoFilter={from:{row:1,column:1},to:{row:1,column:headers.length}};
+  ws.pageSetup={
+   orientation:'landscape',
+   fitToPage:true,
+   fitToWidth:1,
+   fitToHeight:0,
+   paperSize:9,
+   margins:{left:0.25,right:0.25,top:0.5,bottom:0.5,header:0.2,footer:0.2}
+  };
+  ws.properties.defaultColWidth=16;
+  const buffer=await wb.xlsx.writeBuffer();
+  save(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'SmartSheet-AI-Data.xlsx');
+  $('status').textContent='Formatted Excel file created successfully.';
+ }catch(err){$('status').textContent='Excel export failed: '+err.message;}
+}
+function clearAll(){headers=[];records=[];sourceHeaders=[];sourceRecords=[];isPayroll=false;detectedCategory='General Data Entry';$('autoCalc').checked=true;$('calcState').textContent='ON';$('tableSearch').value='';$('duplicateNote').textContent='Duplicate check will appear after analysis. Tap a source cell to edit it.';$('data').value='';autoFitEntryText();$('file').value='';$('category').textContent='Waiting for data...';$('qualityRows').textContent='0';$('qualityColumns').textContent='0';$('qualityMissing').textContent='0';$('qualityNote').textContent='Analyze data to check for missing values.';$('status').textContent='Ready to analyze your data.';$('hint').textContent='Your organized data will appear here.';$('preview').innerHTML='<thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody>';}
+$('file').addEventListener('change',async e=>{let f=e.target.files[0];if(!f)return;try{if(/\.(xlsx|xls)$/i.test(f.name)){if(!window.XLSX)throw Error('Excel reader not loaded.');let wb=XLSX.read(await f.arrayBuffer());let rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows.length)throw Error('No data found in workbook.');$('data').value=JSON.stringify(rows,null,2);analyze();}else{$('data').value=await f.text();analyze();}}catch(err){$('status').textContent=err.message;}});
+
+// Safe local instruction interpreter (starter stage; not a cloud AI model).
+let pendingInstruction=null;
+function cancelInstruction(){
+ pendingInstruction=null;
+ $('instructionPreview').style.display='none';
+ $('applyInstructionBtn').style.display='none';
+ $('instructionStatus').textContent='নির্দেশ বাতিল করা হয়েছে।';
+}
+function instructionText(){return String($('instructionInput').value||'').trim().toLowerCase();}
+function findInstructionColumn(text){
+ const clean=norm(text);
+ // Prefer explicit source-header mentions; match normalized header names.
+ const matches=sourceHeaders.filter(h=>clean.includes(norm(h)) && norm(h).length>1);
+ if(matches.length)return matches.sort((a,b)=>norm(b).length-norm(a).length)[0];
+ const aliases=[
+  {keys:['name','নাম','নামের'],test:/\bname\b|নাম/},
+  {keys:['class','ক্লাস','শ্রেণি'],test:/\bclass\b|ক্লাস|শ্রেণি/},
+  {keys:['roll','রোল'],test:/\broll\b|রোল/},
+  {keys:['date','তারিখ'],test:/\bdate\b|তারিখ/},
+  {keys:['salary','বেতন'],test:/salary|বেতন/}
+ ];
+ for(const a of aliases){if(a.test.test(text)){const h=sourceHeaders.find(x=>a.keys.some(k=>norm(x).includes(norm(k))));if(h)return h;}}
+ return null;
+}
+const SMARTSHEET_BACKEND_URL='https://smartsheet-ai-backend-yqm9.onrender.com';
+
+async function understandInstruction(){
+ if(!sourceRecords.length){$('instructionStatus').textContent='আগে ডেটা Analyze করুন।';return;}
+ const instruction=String($('instructionInput').value||'').trim();
+ if(instruction.length<2){$('instructionStatus').textContent='একটি নির্দেশ লিখুন।';return;}
+ pendingInstruction=null;
+ $('instructionPreview').style.display='none';
+ $('applyInstructionBtn').style.display='none';
+ $('instructionStatus').textContent='AI আপনার নির্দেশ বুঝছে...';
+ const button=$('instructionCard').querySelector('button');
+ if(button)button.disabled=true;
+ try{
+  const response=await fetch(SMARTSHEET_BACKEND_URL+'/api/plan',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({
+    instruction,
+    headers:sourceHeaders,
+    rows:sourceRecords.slice(0,5000).map(r=>({...r}))
+   })
+  });
+  let payload={};
+  try{payload=await response.json();}catch(_){}
+  if(!response.ok)throw new Error(payload.error||`Backend request failed (${response.status}).`);
+  const plan=payload.plan;
+  if(!plan||typeof plan!=='object')throw new Error('AI থেকে সঠিক পরিকল্পনা পাওয়া যায়নি।');
+  if(plan.action==='unsupported'||plan.understood===false){
+   $('instructionStatus').textContent=plan.clarification||'নির্দেশটি পরিষ্কার নয়। অনুগ্রহ করে আরও স্পষ্ট করে লিখুন।';
+   return;
+  }
+  const allowed=['sort','remove_duplicates','filter','calculate'];
+  if(!allowed.includes(plan.action)){
+   $('instructionStatus').textContent=plan.clarification||'এই ধরনের কাজটি এখনো সমর্থিত নয়।';
+   return;
+  }
+  if(plan.action==='sort'&&!sourceHeaders.includes(plan.column)){
+   $('instructionStatus').textContent='AI যে কলামটি বেছে নিয়েছে সেটি আপনার ডেটায় নেই। কলামের সঠিক নাম দিয়ে আবার নির্দেশ দিন।';
+   return;
+  }
+  if(plan.action==='filter'&&!sourceHeaders.includes(plan.column)){
+   $('instructionStatus').textContent='Filter করার কলামটি আপনার ডেটায় পাওয়া যায়নি।';
+   return;
+  }
+  pendingInstruction={...plan,originalCount:sourceRecords.length};
+  let description=plan.summary||'AI আপনার নির্দেশের একটি পরিকল্পনা তৈরি করেছে।';
+  $('instructionPreview').textContent='AI-এর পরিকল্পনা: '+description+' মূল ডেটা এখনো পরিবর্তন হয়নি। নিচের অনুমতি বোতাম চাপলেই কাজটি প্রয়োগ হবে।';
+  $('instructionPreview').style.display='block';
+  $('applyInstructionBtn').style.display='inline-block';
+  $('instructionStatus').textContent='AI নির্দেশটি বুঝেছে। প্রয়োগের আগে Preview দেখে নিন।';
+ }catch(error){
+  console.error('SmartSheet AI request:',error);
+  $('instructionStatus').textContent='AI Backend-এর সঙ্গে যোগাযোগ করা যায়নি: '+error.message+'। একটু পরে আবার চেষ্টা করুন।';
+ }finally{
+  if(button)button.disabled=false;
+ }
+}
+
+function applyInstruction(){
+ if(!pendingInstruction)return;
+ const plan=pendingInstruction;
+ let next=sourceRecords.map(r=>({...r}));
+ if(plan.action==='sort'){
+  const col=plan.column;
+  if(!sourceHeaders.includes(col)){ $('instructionStatus').textContent='সাজানোর কলাম পাওয়া যায়নি।';return; }
+  const desc=/desc|z.?a|descending|বড় থেকে ছোট|বড় থেকে ছোট/i.test(String(plan.direction||''));
+  next.sort((a,b)=>{
+   const av=String(a[col]??'').trim(),bv=String(b[col]??'').trim();
+   const an=Number(av),bn=Number(bv);
+   const cmp=av!==''&&bv!==''&&Number.isFinite(an)&&Number.isFinite(bn)
+    ?an-bn:av.localeCompare(bv,undefined,{numeric:true,sensitivity:'base'});
+   return desc?-cmp:cmp;
+  });
+ }else if(plan.action==='remove_duplicates'){
+  const seen=new Set();
+  next=next.filter(r=>{const sig=sourceHeaders.map(h=>String(r[h]??'').trim().toLowerCase()).join('\u001f');if(seen.has(sig))return false;seen.add(sig);return true;});
+ }else if(plan.action==='filter'){
+  const col=plan.column,needle=String(plan.value??'').toLowerCase();
+  if(!sourceHeaders.includes(col)){ $('instructionStatus').textContent='Filter করার কলাম পাওয়া যায়নি।';return; }
+  const condition=String(plan.condition||'contains').toLowerCase();
+  next=next.filter(r=>{
+   const raw=String(r[col]??''),v=raw.toLowerCase();
+   const a=Number(raw),b=Number(plan.value);
+   if(condition.includes('not'))return !v.includes(needle);
+   if(condition.includes('equal')||condition==='equals'||condition==='=')return v===needle;
+   if(condition.includes('greater')||condition==='>')return Number.isFinite(a)&&Number.isFinite(b)&&a>b;
+   if(condition.includes('less')||condition==='<')return Number.isFinite(a)&&Number.isFinite(b)&&a<b;
+   return v.includes(needle);
+  });
+ }else if(plan.action==='calculate'){
+  $('instructionStatus').textContent='AI হিসাবের পরিকল্পনা দিয়েছে, কিন্তু নিরাপদ Formula যাচাই ছাড়া এটি প্রয়োগ করা হবে না। আপাতত এই নির্দেশটি প্রয়োগ করা যাচ্ছে না।';
+  pendingInstruction=null;
+  $('instructionPreview').style.display='none';
+  $('applyInstructionBtn').style.display='none';
+  return;
+ }else{
+  $('instructionStatus').textContent='এই কাজটি এখনো সমর্থিত নয়।';
+  return;
+ }
+ sourceRecords=next;
+ applyGlobalCalculations();updateQualitySummary();render();autoFitAll();
+ const labels={sort:'ডেটা সাজানো হয়েছে।',remove_duplicates:'ডুপ্লিকেট সারি বাদ দেওয়া হয়েছে।',filter:'নির্দেশ অনুযায়ী ডেটা Filter করা হয়েছে।'};
+ $('status').textContent=labels[plan.action]||'কাজ সম্পন্ন হয়েছে।';
+ $('instructionStatus').textContent='কাজ সম্পন্ন হয়েছে।';
+ pendingInstruction=null;
+ $('instructionPreview').style.display='none';
+ $('applyInstructionBtn').style.display='none';
+}
+
+</script></body></html>
