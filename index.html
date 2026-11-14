@@ -59,6 +59,16 @@ EMP102,Mina Roy,HR,22000,4000,1500,1000"></textarea>
 <div class="calc-control"><label for="autoCalc"><input id="autoCalc" type="checkbox" checked> Enable automatic calculations</label><span id="calcState">ON</span></div>
 <p class="calc-note">ON: calculate supported fields when the required source columns are available. OFF: keep and organize the original data without adding calculation columns.</p>
 </section>
+<section class="card" id="instructionCard">
+<h2>🤖 Smart Instructions</h2>
+<p class="small">নিজের ভাষায় কাজের নির্দেশ লিখুন। SmartSheet AI আগে কী করবে তা দেখাবে; আপনার অনুমতি ছাড়া ডেটা বদলাবে না।</p>
+<textarea id="instructionInput" style="min-height:90px" placeholder="উদাহরণ: নাম অনুযায়ী সাজিয়ে দাও / Sort by Name A to Z / Remove duplicate rows"></textarea>
+<button onclick="understandInstruction()">✨ বুঝে নাও</button>
+<button class="secondary" onclick="cancelInstruction()">Cancel</button>
+<p id="instructionStatus" class="small" aria-live="polite">এখনও কোনো নির্দেশ বিশ্লেষণ করা হয়নি।</p>
+<div id="instructionPreview" class="small" style="display:none;background:#0b1325;border:1px solid #40516f;border-radius:10px;padding:12px;margin-top:10px"></div>
+<button id="applyInstructionBtn" style="display:none" onclick="applyInstruction()">✓ অনুমতি দিন ও কাজ করুন</button>
+</section>
 <section class="card"><h2>📊 Automatic Category</h2><p id="category">Waiting for data...</p></section>
 <section class="card"><h2>🔎 Data Quality Check</h2><div class="quality-grid"><div class="quality-item"><div class="quality-value" id="qualityRows">0</div><div class="quality-label">Data rows</div></div><div class="quality-item"><div class="quality-value" id="qualityColumns">0</div><div class="quality-label">Source columns</div></div><div class="quality-item"><div class="quality-value" id="qualityMissing">0</div><div class="quality-label">Empty source cells</div></div></div><p class="calc-note" id="qualityNote">Analyze data to check for missing values.</p></section>
 <section class="card"><h2>📋 Excel Preview</h2><p class="small" id="hint">Your organized data will appear here.</p>
@@ -385,4 +395,70 @@ async function downloadExcel(){
 }
 function clearAll(){headers=[];records=[];sourceHeaders=[];sourceRecords=[];isPayroll=false;detectedCategory='General Data Entry';$('autoCalc').checked=true;$('calcState').textContent='ON';$('tableSearch').value='';$('duplicateNote').textContent='Duplicate check will appear after analysis. Tap a source cell to edit it.';$('data').value='';autoFitEntryText();$('file').value='';$('category').textContent='Waiting for data...';$('qualityRows').textContent='0';$('qualityColumns').textContent='0';$('qualityMissing').textContent='0';$('qualityNote').textContent='Analyze data to check for missing values.';$('status').textContent='Ready to analyze your data.';$('hint').textContent='Your organized data will appear here.';$('preview').innerHTML='<thead><tr><th>Your data will appear here</th></tr></thead><tbody></tbody>';}
 $('file').addEventListener('change',async e=>{let f=e.target.files[0];if(!f)return;try{if(/\.(xlsx|xls)$/i.test(f.name)){if(!window.XLSX)throw Error('Excel reader not loaded.');let wb=XLSX.read(await f.arrayBuffer());let rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows.length)throw Error('No data found in workbook.');$('data').value=JSON.stringify(rows,null,2);analyze();}else{$('data').value=await f.text();analyze();}}catch(err){$('status').textContent=err.message;}});
+
+// Safe local instruction interpreter (starter stage; not a cloud AI model).
+let pendingInstruction=null;
+function cancelInstruction(){
+ pendingInstruction=null;
+ $('instructionPreview').style.display='none';
+ $('applyInstructionBtn').style.display='none';
+ $('instructionStatus').textContent='নির্দেশ বাতিল করা হয়েছে।';
+}
+function instructionText(){return String($('instructionInput').value||'').trim().toLowerCase();}
+function findInstructionColumn(text){
+ const clean=norm(text);
+ // Prefer explicit source-header mentions; match normalized header names.
+ const matches=sourceHeaders.filter(h=>clean.includes(norm(h)) && norm(h).length>1);
+ if(matches.length)return matches.sort((a,b)=>norm(b).length-norm(a).length)[0];
+ const aliases=[
+  {keys:['name','নাম','নামের'],test:/\bname\b|নাম/},
+  {keys:['class','ক্লাস','শ্রেণি'],test:/\bclass\b|ক্লাস|শ্রেণি/},
+  {keys:['roll','রোল'],test:/\broll\b|রোল/},
+  {keys:['date','তারিখ'],test:/\bdate\b|তারিখ/},
+  {keys:['salary','বেতন'],test:/salary|বেতন/}
+ ];
+ for(const a of aliases){if(a.test.test(text)){const h=sourceHeaders.find(x=>a.keys.some(k=>norm(x).includes(norm(k))));if(h)return h;}}
+ return null;
+}
+function understandInstruction(){
+ if(!sourceRecords.length){$('instructionStatus').textContent='আগে ডেটা Analyze করুন।';return;}
+ const t=instructionText();if(!t){$('instructionStatus').textContent='একটি নির্দেশ লিখুন।';return;}
+ let action=null,description='',next=sourceRecords.map(r=>({...r}));
+ const wantsRemove=/duplicate|duplicates|দুবার|ডুপ্লিকেট|একই রেকর্ড|একই তথ্য/.test(t);
+ const wantsSort=/sort| সাজাও|সাজিয়ে|ক্রমে|ascending|descending|a to z|z to a|ছোট থেকে বড়|বড় থেকে ছোট/.test(t);
+ if(wantsRemove){
+  const seen=new Set();let removed=0;
+  next=next.filter(r=>{const sig=rowSignature(r);if(seen.has(sig)){removed++;return false;}seen.add(sig);return true;});
+  action={type:'dedupe',records:next};description=`একই রকম সম্পূর্ণ রেকর্ড বাদ দিলে ${removed}টি সারি বাদ যাবে। বাকি থাকবে ${next.length}টি সারি।`;
+ }else if(wantsSort){
+  const col=findInstructionColumn(t);
+  if(!col){$('instructionStatus').textContent='কোন কলাম অনুযায়ী সাজাতে হবে বুঝতে পারিনি। নির্দেশে কলামের নামটি লিখুন, যেমন: Sort by Name.';return;}
+  const desc=/descending|z to a|বড় থেকে ছোট|অধঃ|উল্টো/.test(t);
+  next.sort((a,b)=>{
+   const av=String(a[col]??'').trim(),bv=String(b[col]??'').trim();
+   const an=Number(av),bn=Number(bv);
+   const cmp=av!==''&&bv!==''&&Number.isFinite(an)&&Number.isFinite(bn)?an-bn:av.localeCompare(bv,undefined,{numeric:true,sensitivity:'base'});
+   return desc?-cmp:cmp;
+  });
+  action={type:'sort',records:next};description=`“${col}” কলাম ${desc?'বড় থেকে ছোট / Z–A':'ছোট থেকে বড় / A–Z'} ক্রমে সাজানো হবে। মোট ${next.length}টি সারি থাকবে।`;
+ }else{
+  $('instructionStatus').textContent='এই নির্দেশটি এই প্রাথমিক সংস্করণে নিশ্চিতভাবে বুঝতে পারিনি। আপাতত “নাম অনুযায়ী সাজাও” বা “Remove duplicate rows” ধরনের নির্দেশ দিন। যেকোনো ভাষার জটিল নির্দেশ বোঝার জন্য পরবর্তী ধাপে নিরাপদ AI Backend যুক্ত করতে হবে।';
+  return;
+ }
+ pendingInstruction=action;
+ $('instructionPreview').textContent='পরিবর্তনের Preview: '+description+' মূল ডেটা এখনো পরিবর্তন হয়নি।';
+ $('instructionPreview').style.display='block';
+ $('applyInstructionBtn').style.display='inline-block';
+ $('instructionStatus').textContent='নির্দেশ বোঝা হয়েছে। প্রয়োগের আগে Preview দেখে নিন।';
+}
+function applyInstruction(){
+ if(!pendingInstruction)return;
+ sourceRecords=pendingInstruction.records.map(r=>({...r}));
+ applyGlobalCalculations();updateQualitySummary();render();autoFitAll();
+ $('status').textContent=pendingInstruction.type==='dedupe'?'নির্দেশ অনুযায়ী ডুপ্লিকেট সারি বাদ দেওয়া হয়েছে।':'নির্দেশ অনুযায়ী ডেটা সাজানো হয়েছে।';
+ $('instructionStatus').textContent='কাজ সম্পন্ন হয়েছে।';
+ pendingInstruction=null;
+ $('instructionPreview').style.display='none';
+ $('applyInstructionBtn').style.display='none';
+}
 </script></body></html>
